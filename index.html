@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0D1117">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%230D1117' width='192' height='192' rx='32'/><text y='140' font-size='120' text-anchor='middle'>🧾</text></svg>">
+  <title>ReceiptRoad</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #0D1117;
+      --card-bg: #161B22;
+      --primary: #F97316;
+      --secondary: #22D3EE;
+      --text: #F0F6FC;
+      --text-muted: #8B949E;
+      --success: #22C55E;
+      --border: #30363D;
+      --error: #EF4444;
+    }
+
+    html, body {
+      height: 100%;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+      min-height: 100dvh;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      position: relative;
+      background: var(--bg);
+    }
+
+    .header {
+      height: 56px;
+      background: var(--card-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .header-icon {
+      font-size: 24px;
+    }
+
+    .header-title {
+      font-size: 20px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      padding-bottom: 80px;
+    }
+
+    .page {
+      display: none;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .page.active {
+      display: flex;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .form-group:last-of-type {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .form-input, .form-select {
+      width: 100%;
+      padding: 12px;
+      font-size: 15px;
+      font-family: inherit;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .form-input:focus, .form-select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+    }
+
+    .form-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .form-input[type="file"] {
+      padding: 10px;
+      cursor: pointer;
+    }
+
+    .image-preview {
+      margin-top: 12px;
+      border-radius: 8px;
+      overflow: hidden;
+      display: none;
+    }
+
+    .image-preview.show {
+      display: block;
+    }
+
+    .image-preview img {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 14px;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: inherit;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), #EA580C);
+      color: white;
+      box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+    }
+
+    .btn-primary:hover {
+      box-shadow: 0 6px 16px rgba(249, 115, 22, 0.4);
+    }
+
+    .mileage-result {
+      background: linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(34, 211, 238, 0.05));
+      border: 1px solid rgba(34, 211, 238, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      display: none;
+      margin-top: 12px;
+    }
+
+    .mileage-result.show {
+      display: block;
+    }
+
+    .mileage-result-label {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .mileage-result-value {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--secondary);
+    }
+
+    .mileage-result-unit {
+      font-size: 15px;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .history-empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-muted);
+    }
+
+    .history-empty-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+      opacity: 0.5;
+    }
+
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .history-item {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .history-item-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--bg);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .history-item-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .history-item-date {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+
+    .history-item-desc {
+      font-size: 14px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .history-item-amount {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--success);
+    }
+
+    .history-item-amount.cyan {
+      color: var(--secondary);
+    }
+
+    .history-item-tax {
+      display: block;
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .history-item-delete {
+      width: 36px;
+      height: 36px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+
+    .history-item-delete:hover {
+      border-color: var(--error);
+      color: var(--error);
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    .nav {
+      position: fixed;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 480px;
+      height: 64px;
+      background: var(--card-bg);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 8px 24px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: color 0.2s;
+      position: relative;
+    }
+
+    .nav-item::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 24px;
+      height: 3px;
+      background: var(--primary);
+      border-radius: 2px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .nav-item.active {
+      color: var(--primary);
+    }
+
+    .nav-item.active::after {
+      opacity: 1;
+    }
+
+    .nav-item-icon {
+      font-size: 22px;
+    }
+
+    .nav-item-label {
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s;
+      z-index: 100;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .toast.error {
+      border-color: var(--error);
+      color: var(--error);
+    }
+
+    .toast.success {
+      border-color: var(--success);
+      color: var(--success);
+    }
+
+    .btn-camera {
+      background: var(--card-bg);
+      border: 1px dashed var(--border);
+      color: var(--text-muted);
+      margin-top: 8px;
+    }
+
+    .btn-camera:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    .ocr-result {
+      margin-top: 12px;
+      padding: 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: none;
+    }
+
+    .ocr-result.show {
+      display: block;
+    }
+
+    .ocr-result-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .ocr-result-text {
+      font-size: 13px;
+      color: var(--text);
+      white-space: pre-wrap;
+      max-height: 150px;
+      overflow-y: auto;
+      line-height: 1.5;
+    }
+
+    .ocr-loading {
+      display: none;
+      text-align: center;
+      padding: 20px;
+      color: var(--text-muted);
+    }
+
+    .ocr-loading.show {
+      display: block;
+    }
+
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 8px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .btn-scan {
+      margin-top: 8px;
+    }
+
+    #camera-input {
+      display: none;
+    }
+
+    .detected-values {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .detected-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    .detected-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .detected-btn {
+      font-size: 15px;
+      font-weight: 600;
+      background: linear-gradient(135deg, var(--primary), #EA580C);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 14px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <header class="header">
+      <span class="header-icon">🧾</span>
+      <span class="header-title">ReceiptRoad</span>
+    </header>
+
+    <main class="content">
+      <div class="page active" id="page-expenses">
+        <div class="card">
+          <div class="card-title">
+            <span>📝</span> Add Expense
+          </div>
+          <form id="expense-form">
+            <div class="form-group">
+              <label class="form-label" for="expense-date">Date</label>
+              <input type="date" id="expense-date" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="expense-amount">Total Amount</label>
+              <input type="number" id="expense-amount" class="form-input" step="0.01" min="0" placeholder="0.00" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="expense-tax">Tax (optional)</label>
+              <input type="number" id="expense-tax" class="form-input" step="0.01" min="0" placeholder="0.00">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="expense-category">Category</label>
+              <select id="expense-category" class="form-select" required>
+                <option value="Food">Food</option>
+                <option value="Transport">Transport</option>
+                <option value="Lodging">Lodging</option>
+                <option value="Fuel">Fuel</option>
+                <option value="Entertainment">Entertainment</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="expense-image">Receipt Image</label>
+              <input type="file" id="expense-image" class="form-input" accept="image/*" capture="environment">
+              <div class="image-preview" id="image-preview">
+                <img id="preview-img" src="" alt="Receipt preview">
+              </div>
+              <button type="button" class="btn btn-camera" id="btn-camera">📷 Take Photo</button>
+              <input type="file" id="camera-input" accept="image/*" capture="environment">
+            </div>
+            <button type="button" class="btn btn-primary btn-scan" id="btn-scan">🔍 Scan Text</button>
+            <div class="ocr-loading" id="ocr-loading">
+              <div class="spinner"></div>
+              <div>Scanning receipt...</div>
+            </div>
+            <div class="ocr-result" id="ocr-result">
+              <div class="ocr-result-title">SCANNED TEXT</div>
+              <div class="ocr-result-text" id="ocr-text"></div>
+              <div class="form-group" style="margin-top: 12px; margin-bottom: 0;">
+                <label class="form-label">Detected Values</label>
+                <div class="detected-values" id="detected-values"></div>
+              </div>
+            </div>
+            <button type="button" class="btn btn-primary btn-scan" id="btn-scan">🔍 Scan Text</button>
+            <div class="ocr-loading" id="ocr-loading">
+              <div class="spinner"></div>
+              <div>Scanning receipt...</div>
+            </div>
+            <div class="ocr-result" id="ocr-result">
+              <div class="ocr-result-title">SCANNED TEXT</div>
+              <div class="ocr-result-text" id="ocr-text"></div>
+              <div class="form-group" style="margin-top: 12px; margin-bottom: 0;">
+                <label class="form-label">Detected Values</label>
+                <div class="detected-values" id="detected-values"></div>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Expense</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="page" id="page-mileage">
+        <div class="card">
+          <div class="card-title">
+            <span>🚗</span> Log Mileage
+          </div>
+          <form id="mileage-form">
+            <div class="form-group">
+              <label class="form-label" for="mileage-date">Date</label>
+              <input type="date" id="mileage-date" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="mileage-start">Start KM</label>
+              <input type="number" id="mileage-start" class="form-input" min="0" placeholder="0" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="mileage-end">End KM</label>
+              <input type="number" id="mileage-end" class="form-input" min="0" placeholder="0" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Calculate & Save</button>
+            <div class="mileage-result" id="mileage-result">
+              <div class="mileage-result-label">Distance Traveled</div>
+              <div class="mileage-result-value" id="distance-value">0</div>
+              <div class="mileage-result-unit">KM</div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="page" id="page-history">
+        <div class="card">
+          <div class="card-title">
+            <span>📋</span> History
+          </div>
+          <div id="history-content">
+            <div class="history-empty" id="history-empty">
+              <div class="history-empty-icon">📭</div>
+              <div>No entries yet</div>
+            </div>
+            <div class="history-list" id="history-list"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <nav class="nav">
+      <button class="nav-item active" data-page="expenses">
+        <span class="nav-item-icon">🧾</span>
+        <span class="nav-item-label">Expenses</span>
+      </button>
+      <button class="nav-item" data-page="mileage">
+        <span class="nav-item-icon">🚗</span>
+        <span class="nav-item-label">Mileage</span>
+      </button>
+      <button class="nav-item" data-page="history">
+        <span class="nav-item-icon">📜</span>
+        <span class="nav-item-label">History</span>
+      </button>
+    </nav>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const STORAGE_KEY = 'receiptroad_data';
+    let expenses = [];
+    let mileage = [];
+
+    function generateId() {
+      return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    }
+
+    function loadData() {
+      const data = localStorage.getItem(STORAGE_KEY);
+      if (data) {
+        const parsed = JSON.parse(data);
+        expenses = parsed.expenses || [];
+        mileage = parsed.mileage || [];
+      }
+    }
+
+    function saveData() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ expenses, mileage }));
+    }
+
+    function formatDate(dateStr) {
+      const date = new Date(dateStr + 'T00:00:00');
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function showToast(message, type = 'success') {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.className = 'toast ' + type + ' show';
+      setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    function switchPage(pageId) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.getElementById('page-' + pageId).classList.add('active');
+      document.querySelector('[data-page="' + pageId + '"]').classList.add('active');
+      if (pageId === 'history') renderHistory();
+    }
+
+    document.querySelectorAll('.nav-item').forEach(item => {
+      item.addEventListener('click', () => switchPage(item.dataset.page));
+    });
+
+    document.getElementById('expense-date').valueAsDate = new Date();
+    document.getElementById('mileage-date').valueAsDate = new Date();
+
+    const imageInput = document.getElementById('expense-image');
+    const cameraInput = document.getElementById('camera-input');
+    const imagePreview = document.getElementById('image-preview');
+    const previewImg = document.getElementById('preview-img');
+    const btnCamera = document.getElementById('btn-camera');
+    const btnScan = document.getElementById('btn-scan');
+    const ocrLoading = document.getElementById('ocr-loading');
+    const ocrResult = document.getElementById('ocr-result');
+    const ocrText = document.getElementById('ocr-text');
+    let imageBase64 = null;
+
+    function handleImageFile(file) {
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          imageBase64 = e.target.result;
+          previewImg.src = imageBase64;
+          imagePreview.classList.add('show');
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    imageInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      handleImageFile(file);
+    });
+
+    btnCamera.addEventListener('click', () => {
+      cameraInput.click();
+    });
+
+    cameraInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      handleImageFile(file);
+      if (file) showToast('Photo captured! Tap "Scan Text" to analyze', 'success');
+    });
+
+    btnScan.addEventListener('click', async () => {
+      if (!imageBase64) {
+        showToast('Take a photo first', 'error');
+        return;
+      }
+
+      ocrLoading.classList.add('show');
+      ocrResult.classList.remove('show');
+      btnScan.disabled = true;
+
+      try {
+        const result = await Tesseract.recognize(imageBase64, 'eng', {
+          logger: () => {}
+        });
+
+        const text = result.data.text.trim();
+        if (text) {
+          ocrText.textContent = text;
+          ocrResult.classList.add('show');
+
+          const allAmounts = text.match(/\$?\d+\.?\d{0,2}/g) || [];
+          const amounts = [];
+          allAmounts.forEach(amt => {
+            const clean = amt.replace('$', '');
+            const num = parseFloat(clean);
+            if (!isNaN(num) && num > 0) {
+              amounts.push({ original: amt, value: num });
+            }
+          });
+
+          amounts.sort((a, b) => b.value - a.value);
+          const detectedDiv = document.getElementById('detected-values');
+
+          if (amounts.length >= 2) {
+            const taxAmount = amounts.find(a => a.value < amounts[0].value * 0.5) || amounts[1];
+            const totalAmount = amounts[0];
+
+            detectedDiv.innerHTML = `
+              <div class="detected-row">
+                <span class="detected-label">Total:</span>
+                <button type="button" class="detected-btn" data-action="set-amount" data-value="${totalAmount.value}">$${totalAmount.value.toFixed(2)}</button>
+              </div>
+              <div class="detected-row">
+                <span class="detected-label">Tax:</span>
+                <button type="button" class="detected-btn" data-action="set-tax" data-value="${taxAmount.value}">$${taxAmount.value.toFixed(2)}</button>
+              </div>
+            `;
+
+            document.getElementById('expense-amount').value = totalAmount.value;
+            showToast('Total & Tax detected!', 'success');
+          } else if (amounts.length === 1) {
+            detectedDiv.innerHTML = `
+              <div class="detected-row">
+                <span class="detected-label">Total:</span>
+                <button type="button" class="detected-btn" data-action="set-amount" data-value="${amounts[0].value}">$${amounts[0].value.toFixed(2)}</button>
+              </div>
+            `;
+            document.getElementById('expense-amount').value = amounts[0].value;
+            showToast('Amount detected: $' + amounts[0].value.toFixed(2), 'success');
+          } else {
+            showToast('No amounts found in image', 'error');
+          }
+
+          document.querySelectorAll('.detected-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const value = parseFloat(btn.dataset.value);
+              if (btn.dataset.action === 'set-amount') {
+                document.getElementById('expense-amount').value = value;
+                showToast('Total set: $' + value.toFixed(2), 'success');
+              } else if (btn.dataset.action === 'set-tax') {
+                document.getElementById('expense-tax').value = value;
+                showToast('Tax set: $' + value.toFixed(2), 'success');
+              }
+            });
+          });
+
+        } else {
+          showToast('No text found in image', 'error');
+        }
+      } catch (err) {
+        showToast('Scan failed. Try a clearer image.', 'error');
+      }
+
+      ocrLoading.classList.remove('show');
+      btnScan.disabled = false;
+    });
+
+    document.getElementById('expense-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const date = document.getElementById('expense-date').value;
+      const amount = parseFloat(document.getElementById('expense-amount').value);
+      const tax = parseFloat(document.getElementById('expense-tax').value) || 0;
+      const category = document.getElementById('expense-category').value;
+
+      if (amount <= 0) {
+        showToast('Amount must be greater than 0', 'error');
+        return;
+      }
+
+      const expense = {
+        id: generateId(),
+        type: 'expense',
+        date,
+        amount,
+        tax,
+        category,
+        image: imageBase64
+      };
+
+      expenses.push(expense);
+      saveData();
+
+      document.getElementById('expense-form').reset();
+      document.getElementById('expense-date').valueAsDate = new Date();
+      document.getElementById('expense-category').value = 'Food';
+      document.getElementById('expense-tax').value = '';
+      imageBase64 = null;
+      imagePreview.classList.remove('show');
+      ocrResult.classList.remove('show');
+
+      showToast('Expense saved!');
+    });
+
+    const mileageResult = document.getElementById('mileage-result');
+    const distanceValue = document.getElementById('distance-value');
+
+    document.getElementById('mileage-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const date = document.getElementById('mileage-date').value;
+      const startKm = parseFloat(document.getElementById('mileage-start').value);
+      const endKm = parseFloat(document.getElementById('mileage-end').value);
+
+      if (endKm <= startKm) {
+        showToast('End KM must be greater than Start KM', 'error');
+        return;
+      }
+
+      const distance = endKm - startKm;
+
+      const mileageEntry = {
+        id: generateId(),
+        type: 'mileage',
+        date,
+        startKm,
+        endKm,
+        distance
+      };
+
+      mileage.push(mileageEntry);
+      saveData();
+
+      distanceValue.textContent = distance.toLocaleString();
+      mileageResult.classList.add('show');
+      showToast('Mileage saved!');
+
+      setTimeout(() => {
+        document.getElementById('mileage-form').reset();
+        document.getElementById('mileage-date').valueAsDate = new Date();
+        mileageResult.classList.remove('show');
+      }, 2000);
+    });
+
+    function renderHistory() {
+      const historyList = document.getElementById('history-list');
+      const historyEmpty = document.getElementById('history-empty');
+
+      loadData();
+
+      const allEntries = [
+        ...expenses.map(e => ({ ...e, sortDate: e.date })),
+        ...mileage.map(m => ({ ...m, sortDate: m.date }))
+      ].sort((a, b) => new Date(b.sortDate) - new Date(a.sortDate));
+
+      if (allEntries.length === 0) {
+        historyEmpty.style.display = 'block';
+        historyList.innerHTML = '';
+        return;
+      }
+
+      historyEmpty.style.display = 'none';
+      historyList.innerHTML = allEntries.map(entry => {
+        if (entry.type === 'expense') {
+          const taxDisplay = entry.tax ? `<span class="history-item-tax">+$${entry.tax.toFixed(2)} tax</span>` : '';
+          return `
+            <div class="history-item">
+              <div class="history-item-icon">🧾</div>
+              <div class="history-item-content">
+                <div class="history-item-date">${formatDate(entry.date)}</div>
+                <div class="history-item-desc">${entry.category}</div>
+              </div>
+              <div class="history-item-amount">$${entry.amount.toFixed(2)}${taxDisplay}</div>
+              <button class="history-item-delete" data-id="${entry.id}" data-type="expense">🗑</button>
+            </div>
+          `;
+        } else {
+          return `
+            <div class="history-item">
+              <div class="history-item-icon">🚗</div>
+              <div class="history-item-content">
+                <div class="history-item-date">${formatDate(entry.date)}</div>
+                <div class="history-item-desc">${entry.startKm.toLocaleString()} → ${entry.endKm.toLocaleString()} KM</div>
+              </div>
+              <div class="history-item-amount cyan">${entry.distance} KM</div>
+              <button class="history-item-delete" data-id="${entry.id}" data-type="mileage">🗑</button>
+            </div>
+          `;
+        }
+      }).join('');
+
+      document.querySelectorAll('.history-item-delete').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.id;
+          const type = btn.dataset.type;
+          if (type === 'expense') {
+            expenses = expenses.filter(e => e.id !== id);
+          } else {
+            mileage = mileage.filter(m => m.id !== id);
+          }
+          saveData();
+          renderHistory();
+          showToast('Entry deleted');
+        });
+      });
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
